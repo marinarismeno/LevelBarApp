@@ -17,8 +17,8 @@ namespace LevelBarApp
         /// </summary>
         public MainWindow()
         {
-            DataContext = new MainWindowViewModel();
             InitializeComponent();
+            DataContext = new MainWindowViewModel();
         }
     }
 }

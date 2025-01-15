@@ -5,9 +5,55 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LevelBarApp"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" MinHeight="500" Width="800" WindowStartupLocation="CenterScreen" SizeToContent="Height">
+    <Window.Resources>
+        <local:ValueToColorConverter x:Key="ValueToColorConverter" />
+    </Window.Resources>
     <Grid>
-        <StackPanel Orientation="Vertical">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="380"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Visible">
+            <ItemsControl ItemsSource="{Binding LevelBars}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Vertical" Margin="10" HorizontalAlignment="Center">
+                            <ProgressBar
+                                Value="{Binding Level}" 
+                                 Minimum="0"
+                                 Maximum="1"
+                                 Height="300"
+                                 Width="30"
+                                 Margin="10"
+                                 Orientation="Vertical"                                  
+                                 Foreground="{Binding Value, RelativeSource={RelativeSource Self}, Converter={StaticResource ValueToColorConverter}}" />
+
+                            <TextBlock 
+                                Text="{Binding Name}" 
+                                VerticalAlignment="Center" 
+                                HorizontalAlignment="Center"
+                                Margin="0,0,10,0" 
+                                FontWeight="Bold" /> 
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+       
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" >
+            <Button Name="connect_btn" Margin="0,0,10,0" Height="50" Width="120" Background="LightGreen" BorderBrush="Black" BorderThickness="1" Command="{Binding ConnectGeneratorCommand}" VerticalAlignment="Center">
+                <TextBlock Text="Connect Level Bar Generator" FontSize="14" TextWrapping="Wrap"/>
+            </Button>
+            <Button Name="disconnect_btn" Margin="10,0,0,0" Height="50" Width="120" Background="LightCoral" BorderBrush="Black" BorderThickness="1" Command="{Binding DisconnectGeneratorCommand}" VerticalAlignment="Center" >
+                <TextBlock  Text="Disconnect Level Bar Generator" FontSize="14" TextWrapping="Wrap"/>
+            </Button>
         </StackPanel>
     </Grid>
 </Window>

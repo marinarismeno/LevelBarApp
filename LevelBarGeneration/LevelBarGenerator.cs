@@ -69,6 +69,7 @@ namespace LevelBarGeneration
         /// <returns>Connect Task</returns>
         public async Task Connect()
         {
+            
             if (scheduler != null)
             {
                 if (state == GeneratorState.Running)
