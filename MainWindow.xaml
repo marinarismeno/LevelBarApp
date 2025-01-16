@@ -8,6 +8,7 @@
         Title="MainWindow" MinHeight="500" Width="800" WindowStartupLocation="CenterScreen" SizeToContent="Height">
     <Window.Resources>
         <local:ValueToColorConverter x:Key="ValueToColorConverter" />
+        <local:MaxLevelToYPositionConverter x:Key="MaxLevelToYPositionConverter" />
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -25,15 +26,26 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Orientation="Vertical" Margin="10" HorizontalAlignment="Center">
-                            <ProgressBar
-                                Value="{Binding Level}" 
+                            <Canvas Width="30" Height="300" Margin="10">
+                                <ProgressBar
+                                 Value="{Binding Level}" 
                                  Minimum="0"
                                  Maximum="1"
                                  Height="300"
                                  Width="30"
                                  Margin="10"
                                  Orientation="Vertical"                                  
-                                 Foreground="{Binding Value, RelativeSource={RelativeSource Self}, Converter={StaticResource ValueToColorConverter}}" />
+                                 Foreground="{Binding Value, RelativeSource={RelativeSource Self}, Converter={StaticResource ValueToColorConverter}}"/>
+
+                                <!--<TextBlock Text="{Binding MaxLevel}" />-->
+
+                                <Line X1="10" 
+                                      X2="40" 
+                                      Y1="{Binding MaxLevel, Mode=OneWay, Converter={StaticResource MaxLevelToYPositionConverter}, FallbackValue=100}"
+                                      Y2="{Binding MaxLevel, Mode=OneWay, Converter={StaticResource MaxLevelToYPositionConverter}, FallbackValue=200}"
+                                      Stroke="Red" 
+                                      StrokeThickness="2" />        
+                            </Canvas>
 
                             <TextBlock 
                                 Text="{Binding Name}" 

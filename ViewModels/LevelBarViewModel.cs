@@ -4,6 +4,9 @@
 
 namespace LevelBarApp.ViewModels
 {
+    using System;
+    using System.Windows;
+    using System.Windows.Threading;
     using GalaSoft.MvvmLight;
 
     /// <summary>
@@ -17,6 +20,10 @@ namespace LevelBarApp.ViewModels
         private float level = 0.0f;
         private float maxLevel = 0.0f;
         private int id;
+        private float lastMaxLevel = 0.0f; // Peak hold value
+        private DateTime lastResetTime = DateTime.Now;
+        private DispatcherTimer resetTimer;
+
 
         // Properties
 
@@ -64,6 +71,7 @@ namespace LevelBarApp.ViewModels
             set
             {
                 level = value;
+                UpdateMaxLevel();
                 RaisePropertyChanged(nameof(Level));
             }
         }
@@ -82,6 +90,79 @@ namespace LevelBarApp.ViewModels
                 maxLevel = value;
                 RaisePropertyChanged(nameof(MaxLevel));
             }
+        }
+        
+        public float LastMaxLevel
+        {
+            get => lastMaxLevel;
+            set
+            {
+                lastMaxLevel = value;
+                RaisePropertyChanged(nameof(LastMaxLevel));
+            }
+        }
+        
+        public DateTime LastResetTime
+        {
+            get => lastResetTime;
+            set
+            {
+                lastResetTime = value;
+                RaisePropertyChanged(nameof(LastResetTime));
+            }
+        }
+        
+        public DispatcherTimer ResetTimer
+        {
+            get => resetTimer;
+            set
+            {
+                resetTimer = value;
+                RaisePropertyChanged(nameof(ResetTimer));
+            }
+        }
+
+        public LevelBarViewModel()
+        {
+            // Initialize the reset timer
+            resetTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2)
+            };
+            resetTimer.Tick += ResetMaxLevel;
+        }
+
+        private void UpdateMaxLevel()
+        {
+            // Update the maximum level
+            if (level > MaxLevel)
+            {
+                MaxLevel = level;
+
+                // Restart the timer
+                StartResetTimer();
+            }
+        }
+
+        private void StartResetTimer()
+        {
+            // Stop the timer if it's already running
+            if (resetTimer.IsEnabled)
+            {
+                resetTimer.Stop();
+            }
+
+            // Start the timer
+            resetTimer.Start();
+        }
+
+        private void ResetMaxLevel(object sender, EventArgs e)
+        {
+            // Reset MaxLevel to the current Level
+            MaxLevel = Level;
+
+            // Stop the timer after resetting
+            resetTimer.Stop();
         }
     }
 }

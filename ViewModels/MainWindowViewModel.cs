@@ -38,30 +38,6 @@ namespace LevelBarApp.ViewModels
             levelBarGenerator.ChannelAdded += LevelBarGenerator_ChannelAdded;
             levelBarGenerator.ChannelLevelDataReceived += LevelBarGenerator_ChannelDataReceived;
             levelBarGenerator.ChannelRemoved += LevelBarGenerator_ChannelRemoved;
-
-
-
-            ///test
-            ///
-            //LevelBars = new ObservableCollection<LevelBarViewModel>
-            //{
-            //    new LevelBarViewModel { Name = "Channel 1", Level = 0.3f },
-            //    new LevelBarViewModel { Name = "Channel 2", Level = 0.7f },
-            //    new LevelBarViewModel { Name = "Channel 3", Level = 0.9f }
-            //};
-
-            //Task.Run(async () =>
-            //{
-            //    while (true)
-            //    {
-            //        await Task.Delay(1000);
-            //        foreach (var bar in LevelBars)
-            //        {
-            //            bar.Level = new Random().Next(0, 101);
-            //        }
-            //    }
-            //});
-            ///test end
         }
 
         // Properties
@@ -94,6 +70,11 @@ namespace LevelBarApp.ViewModels
         private void LevelBarGenerator_ChannelAdded(object sender, ChannelChangedEventArgs e)
         {
             // Generate a LevelBarViewModel
+            //if (LevelBars.Count==0)
+            //{
+            //    StartResetProcess();
+            //}
+
             try
             {
                 LevelBarViewModel levelBarVM = new LevelBarViewModel() { Id = e.ChannelId, Name = "Channel " + e.ChannelId.ToString() };
@@ -133,7 +114,10 @@ namespace LevelBarApp.ViewModels
                     var itemToUpdate = LevelBars.FirstOrDefault(lb => lb.Id == e.ChannelIds[i]);
                     if (itemToUpdate != null)
                     {
-                        itemToUpdate.Level = e.Levels[i];
+                        //float logScaledLevel = (float)Math.Log10(e.Levels[i] + 1); // Scale 0 to 1 logarithmically
+                        float scaledLevel = (float)Math.Pow(e.Levels[i], 0.5); // Power scaling
+                        //itemToUpdate.MaxLevel = Math.Max(itemToUpdate.MaxLevel, scaledLevel);
+                        itemToUpdate.Level = scaledLevel;
                     }
                 }
             }
@@ -143,6 +127,20 @@ namespace LevelBarApp.ViewModels
             }
 
            
+        }
+
+        private async void StartResetProcess()
+        {
+            while (true)
+            {
+                await Task.Delay(2000);  // Wait for 2 seconds
+
+                // Reset MaxLevel and Level values
+                foreach (var item in LevelBars)
+                {
+                    item.MaxLevel = 0;  // Reset to 0 or any other default value
+                }
+            }
         }
     }
 }
