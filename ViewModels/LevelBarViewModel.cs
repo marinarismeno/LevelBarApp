@@ -5,7 +5,6 @@
 namespace LevelBarApp.ViewModels
 {
     using System;
-    using System.Windows;
     using System.Windows.Threading;
     using GalaSoft.MvvmLight;
 

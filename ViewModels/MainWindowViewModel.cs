@@ -6,9 +6,7 @@ namespace LevelBarApp.ViewModels
 {
     using System;
     using System.Collections.ObjectModel;
-    using System.IO.Packaging;
     using System.Linq;
-    using System.Threading.Tasks;
     using System.Windows;
     using GalaSoft.MvvmLight;
     using GalaSoft.MvvmLight.Command;
@@ -24,6 +22,8 @@ namespace LevelBarApp.ViewModels
         private readonly LevelBarGenerator levelBarGenerator;
         private RelayCommand connectToGeneratorCommand;
         private RelayCommand disconnectToGeneratorCommand;
+        private DateTime lastUpdateTime = DateTime.MinValue;
+        private readonly TimeSpan updateInterval = TimeSpan.FromSeconds(0.3);
 
         // Constructor
 
@@ -69,12 +69,6 @@ namespace LevelBarApp.ViewModels
         // Methods
         private void LevelBarGenerator_ChannelAdded(object sender, ChannelChangedEventArgs e)
         {
-            // Generate a LevelBarViewModel
-            //if (LevelBars.Count==0)
-            //{
-            //    StartResetProcess();
-            //}
-
             try
             {
                 LevelBarViewModel levelBarVM = new LevelBarViewModel() { Id = e.ChannelId, Name = "Channel " + e.ChannelId.ToString() };
@@ -109,14 +103,19 @@ namespace LevelBarApp.ViewModels
             // TODO this is where the level data is coming in
             try
             {
+                // Throttle the updates
+                if ((DateTime.Now - lastUpdateTime) < updateInterval) return;
+
+                lastUpdateTime = DateTime.Now;
+
+                UpdateClusterBounds(e.Levels);
                 for (int i = 0; i < e.ChannelIds.Length; i++)
                 {
                     var itemToUpdate = LevelBars.FirstOrDefault(lb => lb.Id == e.ChannelIds[i]);
                     if (itemToUpdate != null)
                     {
-                        //float logScaledLevel = (float)Math.Log10(e.Levels[i] + 1); // Scale 0 to 1 logarithmically
-                        float scaledLevel = (float)Math.Pow(e.Levels[i], 0.5); // Power scaling
-                        //itemToUpdate.MaxLevel = Math.Max(itemToUpdate.MaxLevel, scaledLevel);
+                        //float scaledLevel = (float)Math.Pow(e.Levels[i], 0.5); // Power scaling
+                        float scaledLevel = (float)ScaledLevel(e.Levels[i]);
                         itemToUpdate.Level = scaledLevel;
                     }
                 }
@@ -125,22 +124,46 @@ namespace LevelBarApp.ViewModels
             {
                 MessageBox.Show(string.Format("Error occured while receiving channel data.\n{0}", ex.Message));
             }
+        }
+        //Linear Scaling with Dynamic Range Adjustment
+        private double MinCluster = 0.098;
+        private double MaxCluster = 0.101;
 
-           
+        //public double ScaledLevel(double level)
+        //{
+        //    // Clamp level to the observed range
+        //    double clampedLevel = Math.Max(MinCluster, Math.Min(MaxCluster, level));
+
+        //    // Scale linearly to 0.0 - 1.0
+        //    return (clampedLevel - MinCluster) / (MaxCluster - MinCluster);
+        //}
+
+        public double ScaledLevel(double level)
+        {
+            // Clamp level to the observed range
+            double clampedLevel = Math.Max(MinCluster, Math.Min(MaxCluster, level));
+
+            // Scale linearly to 0.0 - 1.0
+            double normalizedLevel = (clampedLevel - MinCluster) / (MaxCluster - MinCluster);
+
+            // Ensure the normalized level is above zero for logarithmic conversion
+            double safeLevel = Math.Max(normalizedLevel, 1e-9);
+
+            // Convert to dB scale (VU meters typically use a dB range, e.g., -60 dB to 0 dB)
+            double dbLevel = 20 * Math.Log10(safeLevel);
+
+            // Map dB range (-60 dB to 0 dB) to 0.0 - 1.0 scale
+            double minDb = -60.0;
+            double maxDb = 0.0;
+            return (dbLevel - minDb) / (maxDb - minDb);
         }
 
-        private async void StartResetProcess()
+        private void UpdateClusterBounds(float[] recentLevels)
         {
-            while (true)
-            {
-                await Task.Delay(2000);  // Wait for 2 seconds
+            if (recentLevels.Length == 0) return;
 
-                // Reset MaxLevel and Level values
-                foreach (var item in LevelBars)
-                {
-                    item.MaxLevel = 0;  // Reset to 0 or any other default value
-                }
-            }
+            MinCluster = recentLevels.Min();
+            MaxCluster = recentLevels.Max();
         }
     }
 }
