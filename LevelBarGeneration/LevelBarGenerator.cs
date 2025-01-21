@@ -5,9 +5,8 @@
 namespace LevelBarGeneration
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
-    using Quartz;
-    using Quartz.Impl;
 
     /// <summary>
     /// LevelBarGenerator
@@ -15,8 +14,9 @@ namespace LevelBarGeneration
     public class LevelBarGenerator
     {
         // Fields
-        private readonly IScheduler scheduler;
+        private Timer _timer;
         private GeneratorState state = GeneratorState.Stopped;
+        private CancellationTokenSource _cancellationTokenSource;
 
         // Constructor
 
@@ -25,8 +25,7 @@ namespace LevelBarGeneration
         /// </summary>
         private LevelBarGenerator()
         {
-            StdSchedulerFactory factory = new StdSchedulerFactory();
-            scheduler = factory.GetScheduler().Result;
+
         }
 
         // Events
@@ -69,29 +68,25 @@ namespace LevelBarGeneration
         /// <returns>Connect Task</returns>
         public async Task Connect()
         {
-            
-            if (scheduler != null)
+            if (state == GeneratorState.Running)
             {
-                if (state == GeneratorState.Running)
-                {
-                    Console.WriteLine("Generator is already connected");
-                    return;
-                }
-
-                // What properties are used
-                int channelBlockSize = 512;
-                int samplingRate = 16384;
-                double samplingTime = 1.0d;
-
-                // Setup the channels
-                int numberOfChannels = RegisterChannels();
-
-                // Setup and fire the data generator
-                await SetupDataGenerator(channelBlockSize, samplingRate, samplingTime, numberOfChannels);
-
-                state = GeneratorState.Running;
-                GeneratorStateChanged?.Invoke(this, new GeneratorStateChangedEventArgs { State = GeneratorState.Running });
+                Console.WriteLine("Generator is already connected");
+                return;
             }
+
+            // What properties are used
+            int channelBlockSize = 512;
+            int samplingRate = 16384;
+            double samplingTime = 1.0d;
+
+            // Setup the channels
+            int numberOfChannels = RegisterChannels();
+
+            // Setup and fire the data generator
+            await SetupDataGenerator(channelBlockSize, samplingRate, samplingTime, numberOfChannels);
+
+            state = GeneratorState.Running;
+            GeneratorStateChanged?.Invoke(this, new GeneratorStateChangedEventArgs { State = GeneratorState.Running });
         }
 
         /// <summary>
@@ -100,12 +95,14 @@ namespace LevelBarGeneration
         /// <returns>Disconnect Task</returns>
         public async Task Disconnect()
         {
-            await scheduler.DeleteJob(new JobKey("job"));
+            StopDataGenerator();
 
             DeregisterChannels();
 
             state = GeneratorState.Stopped;
             GeneratorStateChanged?.Invoke(this, new GeneratorStateChangedEventArgs { State = GeneratorState.Stopped });
+
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -122,21 +119,45 @@ namespace LevelBarGeneration
         {
             DataThroughputJob.SetupJob(samplingRate, channelBlockSize, samplingTime, numberOfChannels);
 
-            await Task.Run(async () =>
+            // Calculate the interval
+            double intervalMilliseconds = (channelBlockSize / 8d) / samplingRate * 1000d;
+
+            // Initialize the timer
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
+            _ = Task.Run(async () =>
             {
-                IJobDetail throughputJob = JobBuilder.Create<DataThroughputJob>()
-                    .WithIdentity("job")
-                    .Build();
+                while (!token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        DataThroughputJob.ExecuteJob(); // Execute the job logic
+                        await Task.Delay((int)intervalMilliseconds, token);
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        // Task was canceled; exit gracefully.
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error during job execution: {ex.Message}");
+                    }
+                }
+            }, token);
 
-                ITrigger throughputTrigger = TriggerBuilder.Create()
-                    .WithIdentity("trigger")
-                    .WithSimpleSchedule(x => x.WithInterval(TimeSpan.FromMilliseconds((double)(channelBlockSize / 8d) / samplingRate * 1000d)).RepeatForever())
-                    .StartAt(DateTime.Now.AddSeconds(1))
-                    .Build();
+            await Task.CompletedTask;
+        }
 
-                await scheduler.ScheduleJob(throughputJob, throughputTrigger);
-                await scheduler.Start();
-            });
+        private void StopDataGenerator()
+        {
+            if (_cancellationTokenSource != null)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = null;
+            }
         }
 
         private int RegisterChannels()

@@ -56,7 +56,9 @@ namespace LevelBarApp.ViewModels
         /// <value>
         /// The connect generator.
         /// </value>
-        public RelayCommand ConnectGeneratorCommand => connectToGeneratorCommand ?? (connectToGeneratorCommand = new RelayCommand(new System.Action(async () => await levelBarGenerator.Connect())));
+        public RelayCommand ConnectGeneratorCommand => connectToGeneratorCommand ?? (connectToGeneratorCommand = new RelayCommand((async () => await levelBarGenerator.Connect())));
+
+
 
         /// <summary>
         /// Gets the command to disconnect the generator
@@ -64,7 +66,7 @@ namespace LevelBarApp.ViewModels
         /// <value>
         /// The disconnect generator.
         /// </value>
-        public RelayCommand DisconnectGeneratorCommand => disconnectToGeneratorCommand ?? (disconnectToGeneratorCommand = new RelayCommand(new System.Action(async () => await levelBarGenerator.Disconnect())));
+        public RelayCommand DisconnectGeneratorCommand => disconnectToGeneratorCommand ?? (disconnectToGeneratorCommand = new RelayCommand((async () => await levelBarGenerator.Disconnect())));
 
         // Methods
         private void LevelBarGenerator_ChannelAdded(object sender, ChannelChangedEventArgs e)
@@ -140,19 +142,16 @@ namespace LevelBarApp.ViewModels
 
         public double ScaledLevel(double level)
         {
-            // Clamp level to the observed range
             double clampedLevel = Math.Max(MinCluster, Math.Min(MaxCluster, level));
 
-            // Scale linearly to 0.0 - 1.0
             double normalizedLevel = (clampedLevel - MinCluster) / (MaxCluster - MinCluster);
 
             // Ensure the normalized level is above zero for logarithmic conversion
             double safeLevel = Math.Max(normalizedLevel, 1e-9);
 
-            // Convert to dB scale (VU meters typically use a dB range, e.g., -60 dB to 0 dB)
+            // Convert to dB scale (VU meters typically use a dB range)
             double dbLevel = 20 * Math.Log10(safeLevel);
 
-            // Map dB range (-60 dB to 0 dB) to 0.0 - 1.0 scale
             double minDb = -60.0;
             double maxDb = 0.0;
             return (dbLevel - minDb) / (maxDb - minDb);

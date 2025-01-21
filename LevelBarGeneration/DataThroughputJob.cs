@@ -7,15 +7,15 @@ namespace LevelBarGeneration
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using MathNet.Numerics;
     using MathNet.Numerics.Distributions;
-    using Quartz;
 
     /// <summary>
     /// MockClientDataThrptJob class
     /// </summary>
-    public class DataThroughputJob : IJob
+    public class DataThroughputJob
     {
         // Fields
         private static int samplingRate;
@@ -27,6 +27,9 @@ namespace LevelBarGeneration
         private static int[] channelIds = null;
         private static int[] numsRawData;
         private static int jobCounter = 0;
+
+        private CancellationTokenSource _cancellationTokenSource;
+        private Task _schedulerTask;
 
         // Methods
 
@@ -48,28 +51,80 @@ namespace LevelBarGeneration
         }
 
         /// <summary>
-        /// Called by the <see cref="T:Quartz.IScheduler" /> when a <see cref="T:Quartz.ITrigger" />
-        /// fires that is associated with the <see cref="T:Quartz.IJob" />.
+        /// Starts the job scheduler with a specified interval.
         /// </summary>
-        /// <param name="context">The execution context.</param>
-        /// <returns>Task</returns>
-        /// <remarks>
-        /// The implementation may wish to set a  result object on the
-        /// JobExecutionContext before this method exits.  The result itself
-        /// is meaningless to Quartz, but may be informative to
-        /// <see cref="T:Quartz.IJobListener" />s or
-        /// <see cref="T:Quartz.ITriggerListener" />s that are watching the job's
-        /// execution.
-        /// </remarks>
-        public Task Execute(IJobExecutionContext context)
+        /// <param name="intervalMilliseconds">The interval in milliseconds.</param>
+        public void StartScheduler(int intervalMilliseconds)
         {
-            // Get job context data.
-            SchedulerContext schedulerContext = context.Scheduler.Context;
+            if (_cancellationTokenSource != null)
+            {
+                throw new InvalidOperationException("Scheduler is already running.");
+            }
 
-            // let's not run when there's no data present
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
+            _schedulerTask = Task.Run(async () =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        ExecuteJob();
+                        await Task.Delay(intervalMilliseconds, token);
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        // Task was canceled; exit gracefully.
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error during job execution: {ex.Message}");
+                    }
+                }
+            }, token);
+        }
+
+        /// <summary>
+        /// Stops the job scheduler.
+        /// </summary>
+        public void StopScheduler()
+        {
+            if (_cancellationTokenSource == null)
+            {
+                throw new InvalidOperationException("Scheduler is not running.");
+            }
+
+            _cancellationTokenSource.Cancel();
+            try
+            {
+                _schedulerTask.Wait();
+            }
+            catch (AggregateException ex)
+            {
+                // Handle any exceptions thrown during task cancellation.
+                foreach (var inner in ex.InnerExceptions)
+                {
+                    Console.WriteLine($"Task cancellation exception: {inner.Message}");
+                }
+            }
+            finally
+            {
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = null;
+            }
+        }
+
+        /// <summary>
+        /// Executes the job logic.
+        /// </summary>
+        public static void ExecuteJob()
+        {
+            // Let's not run when there's no data present
             if (levels == null)
             {
-                return Task.CompletedTask;
+                return;
             }
 
             // Get step of the job
@@ -79,9 +134,8 @@ namespace LevelBarGeneration
                 jobCounter = 0;
             }
 
+            // Simulate sending data to LevelBarGenerator
             LevelBarGenerator.Instance.ReceiveLevelData(channelIds, levels[jobCounter]);
-
-            return Task.CompletedTask;
         }
 
         private static byte[][] GenerateData(out float[][] levels, out int[] channelIds, out int[] numsRawData)
